@@ -1,15 +1,17 @@
 import {
   createInterceptor,
   InterceptorApi,
+  IsomorphicRequest,
   MockedResponse,
 } from "@mswjs/interceptors";
 import nodeInterceptors from "@mswjs/interceptors/lib/presets/node";
 import { URL } from "url";
 
-interface Response {
+interface Interaction {
   body: string;
   status: number;
   headers: Record<string, string>;
+  url?: URL;
 }
 
 interface Request {
@@ -19,12 +21,13 @@ interface Request {
   url: URL;
 }
 
-const DEFAULT_RESPONSE = { status: 200 };
+const withoutQueryParams = (url: URL): URL =>
+  new URL(url.origin + url.pathname);
 
 const matchRequest = (req: Request, url: URL) =>
   url.search
     ? req.url.toString() === url.toString()
-    : req.url.origin + req.url.pathname === url.toString();
+    : withoutQueryParams(req.url).toString() === url.toString();
 
 const getRequestByUrl = (requests: Request[], url: URL): Request => {
   const request = requests.find((r) => matchRequest(r, url));
@@ -35,20 +38,50 @@ const getRequestByUrl = (requests: Request[], url: URL): Request => {
 const getRequestsByUrl = (requests: Request[], url: URL): Request[] =>
   requests.filter((r) => matchRequest(r, url));
 
+const validateInteraction = (
+  interaction: Interaction,
+  request: IsomorphicRequest
+): void => {
+  if (
+    interaction.url &&
+    interaction.url.toString() !== withoutQueryParams(request.url).toString()
+  ) {
+    throw new Error(`Expected: ${interaction.url}`);
+  }
+};
+
 const getResponse = (
-  responses: Response[],
+  props: MockNetworkProps,
+  request: IsomorphicRequest,
   requests: Request[]
-): MockedResponse => responses[requests.length] || DEFAULT_RESPONSE;
+): MockedResponse => {
+  const interaction = props.interactions
+    ? props.interactions[requests.length]
+    : null;
+  if (!interaction) {
+    if (props.defaultResponse) return props.defaultResponse;
+    throw new Error("No interaction or default response configured");
+  }
+
+  validateInteraction(interaction, request);
+  return interaction;
+};
 
 let interceptor: InterceptorApi | undefined;
 
-export const mockNetwork = (responses?: Response[]) => {
+interface MockNetworkProps {
+  interactions?: Interaction[];
+  defaultResponse?: MockedResponse;
+}
+
+export const mockNetwork = (props?: MockNetworkProps) => {
   const requests: Request[] = [];
 
   interceptor = createInterceptor({
     modules: nodeInterceptors,
     resolver(request) {
-      const response = getResponse(responses || [], requests);
+      const response = getResponse(props || {}, request, requests);
+
       requests.push({
         method: request.method,
         body: request.body,
@@ -71,8 +104,32 @@ export const mockNetwork = (responses?: Response[]) => {
 
 export const unmockNetwork = () => interceptor?.restore();
 
-export const mockJsonResponse = (body: Record<string, unknown>): Response => ({
+export const mockJsonResponse = ({
+  body,
+  status,
+  url,
+}: {
+  body: Record<string, unknown>;
+  status?: number;
+  url?: string;
+}): Interaction => ({
   body: JSON.stringify(body),
   headers: { "content-type": "application/json" },
-  status: 200,
+  status: status || 200,
+  url: url ? new URL(url) : undefined,
+});
+
+export const mockTextResponse = ({
+  body,
+  status,
+  url,
+}: {
+  body: string;
+  status?: number;
+  url?: string;
+}): Interaction => ({
+  body,
+  headers: { "content-type": "text/plain" },
+  status: status || 200,
+  url: url ? new URL(url) : undefined,
 });

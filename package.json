@@ -6,6 +6,7 @@
   "author": "Keith Broughton <hello@keithbro.com>",
   "license": "MIT",
   "devDependencies": {
+    "@tsconfig/node14": "^1.0.1",
     "@types/jest": "^27.0.1",
     "@types/node": "^16.7.1",
     "@types/node-fetch": "^2.5.12",

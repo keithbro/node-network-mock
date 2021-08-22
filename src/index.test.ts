@@ -1,6 +1,13 @@
 import fetch from "node-fetch";
 import { URL } from "url";
-import { mockNetwork, unmockNetwork, mockJsonResponse } from ".";
+import {
+  mockNetwork,
+  unmockNetwork,
+  mockJsonResponse,
+  mockTextResponse,
+} from ".";
+
+const defaultResponse = mockTextResponse({ body: "" });
 
 describe("index", () => {
   afterEach(() => {
@@ -8,59 +15,99 @@ describe("index", () => {
   });
 
   describe("mockNetwork", () => {
-    it("responds with an empty body by default", async () => {
+    it("blocks all network calls by default", async () => {
       mockNetwork();
+
+      await expect(() => fetch("https://httpbin.org/post")).rejects.toThrow(
+        "request to https://httpbin.org/post failed, reason: No interaction or default response configured"
+      );
+    });
+
+    it("can take with a default response", async () => {
+      mockNetwork({ defaultResponse });
 
       const res = await fetch("https://httpbin.org/post");
 
       expect(await res.text()).toEqual("");
     });
 
-    it("allows a response to be defined", async () => {
-      mockNetwork([
-        {
-          body: "hello world",
-          status: 200,
-          headers: {},
-        },
-      ]);
+    it("allows an interaction to be defined", async () => {
+      mockNetwork({
+        interactions: [
+          {
+            body: "hello world",
+            status: 200,
+            headers: {},
+          },
+        ],
+      });
 
-      const firstRes = await fetch("https://httpbin.org/get");
-      const secondRes = await fetch("https://httpbin.org/get");
+      const res = await fetch("https://httpbin.org/get");
 
-      expect(await firstRes.text()).toEqual("hello world");
-      expect(await secondRes.text()).toEqual("");
+      expect(await res.text()).toEqual("hello world");
     });
 
-    it("allows multiple responses to be defined", async () => {
+    it("allows multiple interactions to be defined", async () => {
       const url = "https://httpbin.org/get";
 
-      mockNetwork([
-        {
-          body: "First Response",
-          status: 200,
-          headers: {},
-        },
-        {
-          body: "Second Response",
-          status: 200,
-          headers: {},
-        },
-      ]);
+      mockNetwork({
+        interactions: [
+          {
+            body: "First Response",
+            status: 200,
+            headers: {},
+          },
+          {
+            body: "Second Response",
+            status: 200,
+            headers: {},
+          },
+        ],
+      });
 
       const firstRes = await fetch(url);
       const secondRes = await fetch(url);
-      const thirdRes = await fetch(url);
 
       expect(await firstRes.text()).toEqual("First Response");
       expect(await secondRes.text()).toEqual("Second Response");
-      expect(await thirdRes.text()).toEqual("");
+    });
+
+    it("throws when URL assertions fail", async () => {
+      mockNetwork({
+        interactions: [
+          mockTextResponse({ body: "HELLO", url: "https://httpbin.org/get" }),
+        ],
+      });
+
+      await expect(() => fetch("https://httpbin.org/post")).rejects.toThrow(
+        "request to https://httpbin.org/post failed, reason: Expected: https://httpbin.org/get"
+      );
+    });
+
+    it("succeeds when URL assertions pass", async () => {
+      mockNetwork({
+        interactions: [
+          mockTextResponse({ body: "HELLO", url: "https://httpbin.org/get" }),
+        ],
+      });
+
+      await fetch("https://httpbin.org/get");
+    });
+
+    it("does not require query params to assert a URL", async () => {
+      mockNetwork({
+        interactions: [
+          mockTextResponse({ body: "HELLO", url: "https://httpbin.org/get" }),
+        ],
+      });
+
+      await fetch("https://httpbin.org/get?n=1");
     });
   });
 
   describe("getAllRequests", () => {
     it("can detect GETs", async () => {
-      const network = mockNetwork();
+      const network = mockNetwork({ defaultResponse });
 
       await fetch("https://httpbin.org/get");
 
@@ -81,7 +128,7 @@ describe("index", () => {
     });
 
     it("can detect POSTs", async () => {
-      const network = mockNetwork();
+      const network = mockNetwork({ defaultResponse });
       const body = JSON.stringify({ hello: "world" });
 
       const res = await fetch("https://httpbin.org/post", {
@@ -110,7 +157,9 @@ describe("index", () => {
 
   describe("mockJsonResponse", () => {
     it("can be parsed by node-fetch", async () => {
-      const network = mockNetwork([mockJsonResponse({ hello: "world" })]);
+      const network = mockNetwork({
+        interactions: [mockJsonResponse({ body: { hello: "world" } })],
+      });
 
       const body = await fetch("https://httpbin.org/get").then((res) =>
         res.json()
@@ -122,7 +171,7 @@ describe("index", () => {
 
   describe("getRequestByUrl", () => {
     it("returns the first request made to that URL", async () => {
-      const network = mockNetwork();
+      const network = mockNetwork({ defaultResponse });
 
       await fetch("https://httpbin.org/get?n=1");
       await fetch("https://httpbin.org/get?n=2");
@@ -132,7 +181,7 @@ describe("index", () => {
     });
 
     it("respects the query params if provided", async () => {
-      const network = mockNetwork();
+      const network = mockNetwork({ defaultResponse });
 
       await fetch("https://httpbin.org/get?n=1");
       await fetch("https://httpbin.org/get?n=2");
@@ -142,7 +191,7 @@ describe("index", () => {
     });
 
     it("throws if no requests were made to the URL", async () => {
-      const network = mockNetwork();
+      const network = mockNetwork({ defaultResponse });
 
       await fetch("https://httpbin.org/get");
 
