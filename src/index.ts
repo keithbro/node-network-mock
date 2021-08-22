@@ -1,14 +1,13 @@
-import {
-  createInterceptor,
-  IsomorphicRequest,
-  MockedResponse,
-} from "@mswjs/interceptors";
+import { createInterceptor, MockedResponse } from "@mswjs/interceptors";
 import nodeInterceptors from "@mswjs/interceptors/lib/presets/node";
 import { URL } from "url";
 
-type Playbook =
-  | Record<string, MockedResponse>
-  | Record<string, MockedResponse[]>;
+interface Response {
+  body: string;
+  method: "GET";
+  status: number;
+  url: string;
+}
 
 interface Request {
   method: string;
@@ -19,46 +18,32 @@ interface Request {
 
 const DEFAULT_RESPONSE = { status: 200 };
 
-const getRequestByUrl = (requests: Request[], url: string): Request => {
-  const parsedUrl = new URL(url);
-  const request = requests.find((req) =>
-    parsedUrl.search
-      ? req.url.toString() === url
-      : req.url.origin + req.url.pathname === url
-  );
+const matchRequest = (req: Request, url: URL) =>
+  url.search
+    ? req.url.toString() === url.toString()
+    : req.url.origin + req.url.pathname === url.toString();
+
+const getRequestByUrl = (requests: Request[], url: URL): Request => {
+  const request = requests.find((r) => matchRequest(r, url));
   if (!request) throw new Error(`No request found for URL: ${url}`);
   return request;
 };
 
-const getRequestsByUrl = (requests: Request[], url: string): Request[] =>
-  requests.filter((r) => r.url.toString() === url);
+const getRequestsByUrl = (requests: Request[], url: URL): Request[] =>
+  requests.filter((r) => matchRequest(r, url));
 
 const getResponse = (
-  playbook: Playbook | undefined,
-  request: IsomorphicRequest,
+  responses: Response[],
   requests: Request[]
-): MockedResponse => {
-  if (!playbook) return DEFAULT_RESPONSE;
+): MockedResponse => responses[requests.length] || DEFAULT_RESPONSE;
 
-  const url = request.url as URL;
-  const urlPlaybook = playbook[url.toString()];
-  if (!urlPlaybook) return DEFAULT_RESPONSE;
-
-  if (Array.isArray(urlPlaybook)) {
-    const requestsMade = getRequestsByUrl(requests, url.toString());
-    return urlPlaybook[requestsMade.length] || DEFAULT_RESPONSE;
-  }
-
-  return urlPlaybook;
-};
-
-export const mockNetwork = (playbook?: Playbook) => {
+export const mockNetwork = (responses?: Response[]) => {
   const requests: Request[] = [];
 
   const interceptor = createInterceptor({
     modules: nodeInterceptors,
     resolver(request) {
-      const response = getResponse(playbook, request, requests);
+      const response = getResponse(responses || [], requests);
       requests.push({
         method: request.method,
         body: request.body,
@@ -74,7 +59,7 @@ export const mockNetwork = (playbook?: Playbook) => {
 
   return {
     getAllRequests: () => requests,
-    getRequestByUrl: (url: string) => getRequestByUrl(requests, url),
-    getRequestsByUrl: (url: string) => getRequestsByUrl(requests, url),
+    getRequestByUrl: (url: string) => getRequestByUrl(requests, new URL(url)),
+    getRequestsByUrl: (url: string) => getRequestsByUrl(requests, new URL(url)),
   };
 };

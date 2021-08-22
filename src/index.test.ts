@@ -13,11 +13,14 @@ describe("index", () => {
 
   describe("mockNetwork", () => {
     it("allows a response to be defined per url", async () => {
-      mockNetwork({
-        "https://httpbin.org/get": {
+      mockNetwork([
+        {
+          url: "https://httpbin.org/get",
           body: "hello world",
+          status: 200,
+          method: "GET",
         },
-      });
+      ]);
 
       const res = await fetch("https://httpbin.org/get");
 
@@ -26,16 +29,20 @@ describe("index", () => {
 
     it("allows multiple responses to be defined per url", async () => {
       const url = "https://httpbin.org/get";
-      mockNetwork({
-        [url]: [
-          {
-            body: "First Response",
-          },
-          {
-            body: "Second Response",
-          },
-        ],
-      });
+      mockNetwork([
+        {
+          body: "First Response",
+          method: "GET",
+          status: 200,
+          url,
+        },
+        {
+          body: "Second Response",
+          method: "GET",
+          status: 200,
+          url,
+        },
+      ]);
 
       const firstRes = await fetch(url);
       const secondRes = await fetch(url);
