@@ -8,9 +8,8 @@ import { URL } from "url";
 
 interface Response {
   body: string;
-  method: "GET";
   status: number;
-  url: string;
+  headers: Record<string, string>;
 }
 
 interface Request {
@@ -71,3 +70,9 @@ export const mockNetwork = (responses?: Response[]) => {
 };
 
 export const unmockNetwork = () => interceptor?.restore();
+
+export const mockJsonResponse = (body: Record<string, unknown>): Response => ({
+  body: JSON.stringify(body),
+  headers: { "content-type": "application/json" },
+  status: 200,
+});

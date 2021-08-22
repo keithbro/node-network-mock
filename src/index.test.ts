@@ -1,50 +1,50 @@
 import fetch from "node-fetch";
 import { URL } from "url";
-import { mockNetwork, unmockNetwork } from "./index";
+import { mockNetwork, unmockNetwork, mockJsonResponse } from ".";
 
 describe("index", () => {
   afterEach(() => {
     unmockNetwork();
   });
 
-  it("responds with an empty body by default", async () => {
-    mockNetwork();
-
-    const res = await fetch("https://httpbin.org/post");
-
-    expect(await res.text()).toEqual("");
-  });
-
   describe("mockNetwork", () => {
-    it("allows a response to be defined per url", async () => {
+    it("responds with an empty body by default", async () => {
+      mockNetwork();
+
+      const res = await fetch("https://httpbin.org/post");
+
+      expect(await res.text()).toEqual("");
+    });
+
+    it("allows a response to be defined", async () => {
       mockNetwork([
         {
-          url: "https://httpbin.org/get",
           body: "hello world",
           status: 200,
-          method: "GET",
+          headers: {},
         },
       ]);
 
-      const res = await fetch("https://httpbin.org/get");
+      const firstRes = await fetch("https://httpbin.org/get");
+      const secondRes = await fetch("https://httpbin.org/get");
 
-      expect(await res.text()).toEqual("hello world");
+      expect(await firstRes.text()).toEqual("hello world");
+      expect(await secondRes.text()).toEqual("");
     });
 
-    it("allows multiple responses to be defined per url", async () => {
+    it("allows multiple responses to be defined", async () => {
       const url = "https://httpbin.org/get";
+
       mockNetwork([
         {
           body: "First Response",
-          method: "GET",
           status: 200,
-          url,
+          headers: {},
         },
         {
           body: "Second Response",
-          method: "GET",
           status: 200,
-          url,
+          headers: {},
         },
       ]);
 
@@ -84,7 +84,7 @@ describe("index", () => {
       const network = mockNetwork();
       const body = JSON.stringify({ hello: "world" });
 
-      await fetch("https://httpbin.org/post", {
+      const res = await fetch("https://httpbin.org/post", {
         method: "POST",
         body,
       });
@@ -105,6 +105,18 @@ describe("index", () => {
           },
         },
       ]);
+    });
+  });
+
+  describe("mockJsonResponse", () => {
+    it("can be parsed by node-fetch", async () => {
+      const network = mockNetwork([mockJsonResponse({ hello: "world" })]);
+
+      const body = await fetch("https://httpbin.org/get").then((res) =>
+        res.json()
+      );
+
+      expect(body).toEqual({ hello: "world" });
     });
   });
 
