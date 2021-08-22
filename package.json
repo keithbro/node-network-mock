@@ -1,0 +1,23 @@
+{
+  "name": "untitled",
+  "version": "1.0.0",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "author": "Keith Broughton <hello@keithbro.com>",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/jest": "^27.0.1",
+    "@types/node": "^16.7.1",
+    "@types/node-fetch": "^2.5.12",
+    "jest": "^27.0.6",
+    "node-fetch": "^2.6.1",
+    "ts-jest": "^27.0.5",
+    "typescript": "^4.3.5"
+  },
+  "scripts": {
+    "test": "jest"
+  },
+  "dependencies": {
+    "@mswjs/interceptors": "^0.12.6"
+  }
+}
