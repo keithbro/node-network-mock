@@ -1,4 +1,8 @@
-import { createInterceptor, MockedResponse } from "@mswjs/interceptors";
+import {
+  createInterceptor,
+  InterceptorApi,
+  MockedResponse,
+} from "@mswjs/interceptors";
 import nodeInterceptors from "@mswjs/interceptors/lib/presets/node";
 import { URL } from "url";
 
@@ -37,10 +41,12 @@ const getResponse = (
   requests: Request[]
 ): MockedResponse => responses[requests.length] || DEFAULT_RESPONSE;
 
+let interceptor: InterceptorApi | undefined;
+
 export const mockNetwork = (responses?: Response[]) => {
   const requests: Request[] = [];
 
-  const interceptor = createInterceptor({
+  interceptor = createInterceptor({
     modules: nodeInterceptors,
     resolver(request) {
       const response = getResponse(responses || [], requests);
@@ -63,3 +69,5 @@ export const mockNetwork = (responses?: Response[]) => {
     getRequestsByUrl: (url: string) => getRequestsByUrl(requests, new URL(url)),
   };
 };
+
+export const unmockNetwork = () => interceptor?.restore();

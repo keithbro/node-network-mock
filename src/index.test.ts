@@ -1,8 +1,12 @@
 import fetch from "node-fetch";
 import { URL } from "url";
-import { mockNetwork } from "./index";
+import { mockNetwork, unmockNetwork } from "./index";
 
 describe("index", () => {
+  afterEach(() => {
+    unmockNetwork();
+  });
+
   it("responds with an empty body by default", async () => {
     mockNetwork();
 
